@@ -119,7 +119,7 @@ def update_wj_3(new_wj, hj, Mj, W, j, m, _lambda, mu=1, itermax=1000):
     return new_wj
 
 
-def nmf(M, W, H, _lambda=0.0, itermax=1000):
+def nmf(M, W, H, _lambda=0.0, itermax=1000, update_ver=2):
     scores = np.empty((1, itermax))
     scores[:] = np.NaN
 
@@ -142,9 +142,14 @@ def nmf(M, W, H, _lambda=0.0, itermax=1000):
             H[j: j + 1, :] = hj = non_neg(wj.T @ Mj) / (np.linalg.norm(wj) ** 2)
 
             # update w_j
-            # W[:, j: j + 1] = wj = update_wj_1(W, Mj, wj, hj, j, m, _lambda)
-            # W[:, j: j + 1] = wj = update_wj_2(W, Mj, wj, hj, j, m, r, _lambda)
-            W[:, j: j + 1] = wj = update_wj_3(wj, hj, Mj, W, j, m, _lambda)
+
+            if update_ver == 1:
+                W[:, j: j + 1] = wj = update_wj_1(W, Mj, wj, hj, j, m, _lambda)
+            elif update_ver == 2:
+                W[:, j: j + 1] = wj = update_wj_2(W, Mj, wj, hj, j, m, r, _lambda)
+            elif update_ver == 3:
+                W[:, j: j + 1] = wj = update_wj_3(wj, hj, Mj, W, j, m, _lambda)
+
             Mj = Mj - wj @ hj
         scores[0, it] = np.linalg.norm(M - W @ H, 'fro')
         if scores[0, it] > best_score:
@@ -173,5 +178,5 @@ if __name__ == '__main__':
     r = 5
     W_ini = np.random.rand(m, r)
     H_ini = np.random.rand(r, n)
-    W, H, scores = nmf(M, W_ini, H_ini, _lambda=0.4, itermax=1000)
+    W, H, scores = nmf(M, W_ini, H_ini, _lambda=0.4, itermax=100, update_ver=2)
     print('done')
