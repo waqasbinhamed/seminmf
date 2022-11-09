@@ -135,8 +135,8 @@ def nmf(M, W, H, _lambda=0.0, itermax=1000, update_ver=2, scaled=False, gswitch=
         scaled_lambda = _lambda
     under_theshold_flag = False
 
-    fscores = np.zeros((itermax, 1))
-    gscores = np.zeros((itermax, 1))
+    fscores = np.zeros((itermax,))
+    gscores = np.zeros((itermax,))
     best_score = np.Inf
     W_best = np.empty((m, r))
     H_best = np.empty((r, n))
