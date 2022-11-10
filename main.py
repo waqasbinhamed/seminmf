@@ -31,7 +31,6 @@ def func(c, diff_wis_norm, hj_norm_sq, MhT, _lambda):
 
 
 def update_wj_1(W, Mj, c, hj, j, m, _lambda, itermax=1000):
-
     def unit_norm_vec(sz):
         tau = np.zeros((sz, 1))
         tau[0] = 1
@@ -122,17 +121,18 @@ def update_wj_3(new_wj, hj, Mj, W, j, m, _lambda, mu=1, itermax=1000):
     return new_wj
 
 
-def nmf(M, W, H, _lambda=0.0, itermax=1000, update_ver=2, scaled=False, gswitch=False):
+def nmf(M, W, H, _lambda=0.0, itermax=1000, update_ver=2, scale_lambda=False, gswitch=False):
     m, n = M.shape
     r = W.shape[1]
 
-    if scaled:
+    if scale_lambda:
         g_ini = 0
         for i in range(r):
             g_ini += np.sum(np.linalg.norm(W[:, i: i + 1] - W[:, i + 1:], axis=0))
         scaled_lambda = (np.linalg.norm(M - W @ H, 'fro') / g_ini) * _lambda
     else:
         scaled_lambda = _lambda
+
     under_theshold_flag = False
 
     fscores = np.zeros((itermax,))
@@ -164,7 +164,7 @@ def nmf(M, W, H, _lambda=0.0, itermax=1000, update_ver=2, scaled=False, gswitch=
 
         fscores[it] = np.linalg.norm(M - W @ H, 'fro')
         for i in range(r):
-            gscores[it] += np.sum(np.linalg.norm(W[:, i: i+1] - W[:, i+1:], axis=0))
+            gscores[it] += np.sum(np.linalg.norm(W[:, i: i + 1] - W[:, i + 1:], axis=0))
         total_score = fscores[it] + scaled_lambda * gscores[it]
         if total_score > best_score:
             best_score = total_score
@@ -181,7 +181,6 @@ def nmf(M, W, H, _lambda=0.0, itermax=1000, update_ver=2, scaled=False, gswitch=
                 under_theshold_flag = False
 
     return W_best, H_best, W, H, fscores, gscores
-
 
 # if __name__ == '__main__':
 #     np.random.seed(42)
