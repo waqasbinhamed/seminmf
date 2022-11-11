@@ -73,7 +73,7 @@ def update_wj_2(W, Mj, new_z, hj, j, m, r, _lambda, rho=0.75, itermax=1000):
         y0 = new_y0
         yi_arr = new_yi_arr
 
-        new_wf = (Mj @ hj.T - yf + rho * z) / (rho + hj_norm_sq)
+        new_wf = non_neg((Mj @ hj.T - yf + rho * z) / (rho + hj_norm_sq))
         new_w0 = non_neg(z - y0 / rho)
 
         zeta_arr = z - yi_arr / rho
@@ -83,7 +83,7 @@ def update_wj_2(W, Mj, new_z, hj, j, m, r, _lambda, rho=0.75, itermax=1000):
         norm_mask = tmp_norm > 1
         new_wi_arr[:, norm_mask] = zeta_arr[:, norm_mask] - _lambda * (tmp_arr[:, norm_mask] / tmp_norm[norm_mask])
         new_wi_arr[:, ~norm_mask] = zeta_arr[:, ~norm_mask] - _lambda * tmp_arr[:, ~norm_mask]
-
+        new_wi_arr = non_neg(new_wi_arr)
         new_z = (rho * (new_wf + new_w0) + rho * np.sum(new_wi_arr, axis=1).reshape(m, 1) + yf + y0 + np.sum(yi_arr,
                                                                                                              axis=1).reshape(
             m, 1)) / (rho * (2 + num_edges))
@@ -182,23 +182,26 @@ def nmf(M, W, H, _lambda=0.0, itermax=1000, update_ver=2, scale_lambda=False, gs
 
     return W_best, H_best, W, H, fscores, gscores
 
-# if __name__ == '__main__':
-#     np.random.seed(42)
-#
-#     def zeros_mask(arr):
-#         m, n = arr.shape
-#         indices = np.random.choice(m * n, replace=False, size=int(m * n * 0.4))
-#         arr[np.unravel_index(indices, (m, n))] = 0
-#         return arr
-#
-#
-#     m, n, r_true = 8, 5, 3
-#     W_true = zeros_mask(np.random.rand(m, r_true))
-#     H_true = zeros_mask(np.random.rand(r_true, n))
-#     M = W_true @ H_true
-#
-#     r = 5
-#     W_ini = np.random.rand(m, r)
-#     H_ini = np.random.rand(r, n)
-#     W, H, fscores, gscores = nmf(M, W_ini, H_ini, _lambda=0.4, itermax=100, update_ver=2)
-#     print('done')
+if __name__ == '__main__':
+    np.random.seed(42)
+
+    def zeros_mask(arr):
+        m, n = arr.shape
+        indices = np.random.choice(m * n, replace=False, size=int(m * n * 0.4))
+        arr[np.unravel_index(indices, (m, n))] = 0
+        return arr
+
+
+    m, n, r_true = 12, 8, 3
+    W_true = np.zeros((m, r_true))
+    W_true[0:4, 0] = 1
+    W_true[4:8, 1] = 1
+    W_true[8:m, 2] = 1
+    H_true = zeros_mask(np.random.rand(r_true, n))
+    M = W_true @ H_true
+
+    r = 5
+    W_ini = np.random.rand(m, r)
+    H_ini = np.random.rand(r, n)
+    Wb, Hb, Wl, Hl, fscores, gscores = nmf(M, W_ini, H_ini, _lambda=0.4, itermax=100, update_ver=2)
+    print('done')
