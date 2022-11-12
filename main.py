@@ -121,7 +121,7 @@ def update_wj_3(new_wj, hj, Mj, W, j, m, _lambda, mu=1, itermax=1000):
     return new_wj
 
 
-def nmf(M, W, H, _lambda=0.0, itermax=1000, update_ver=2, scale_lambda=False, gswitch=False):
+def nmf(M, W, H, _lambda=0.0, itermax=1000, update_ver=2, scale_lambda=False, gswitch=False, verbose=False):
     m, n = M.shape
     r = W.shape[1]
 
@@ -170,7 +170,9 @@ def nmf(M, W, H, _lambda=0.0, itermax=1000, update_ver=2, scale_lambda=False, gs
             best_score = total_score
             W_best = W
             H_best = H
-        print(f'Iteration: {it + 1}, f={fscores[it]}, g={gscores[it]},  total={total_score}')
+
+        if verbose:
+            print(f'Iteration: {it + 1}, f={fscores[it]}, g={gscores[it]},  total={total_score}')
 
         if gswitch:
             if gscores[it] < 0.1 and not under_theshold_flag:
