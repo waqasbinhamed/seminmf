@@ -13,12 +13,12 @@ def calculate_gscore(W, r):
     return gscore
 
 
-def update_wj(W, Mj, new_z, hj, j, m, r, _lambda, rho=0.5, itermax=1000):
+def update_wj(W, Mj, new_z, hj, j, m, r, _lambda, rho=0.75, itermax=1000):
     num_edges = r * (r - 1)
     ci_arr = np.delete(W, j, axis=1)
-    
+
     new_wi_arr = np.zeros((m, r - 1))
-    
+
     new_yi_arr = np.random.rand(m, r - 1)
     new_yf = np.random.rand(m, 1)
     new_y0 = np.random.rand(m, 1)
@@ -41,7 +41,10 @@ def update_wj(W, Mj, new_z, hj, j, m, r, _lambda, rho=0.5, itermax=1000):
         new_wi_arr[:, norm_mask] = zeta_arr[:, norm_mask] - _lambda * (tmp_arr[:, norm_mask] / tmp_norm[norm_mask])
         new_wi_arr[:, ~norm_mask] = zeta_arr[:, ~norm_mask] - _lambda * tmp_arr[:, ~norm_mask]
 
-        new_z = (rho * (new_wf + new_w0) + rho * np.sum(new_wi_arr, axis=1, keepdims=True) + yf + y0 + np.sum(yi_arr, axis=1, keepdims=True)) / (rho * (2 + num_edges))
+        new_z = (rho * (new_wf + new_w0) + rho * np.sum(new_wi_arr, axis=1, keepdims=True) + yf + y0 + np.sum(yi_arr,
+                                                                                                              axis=1,
+                                                                                                              keepdims=True)) / (
+                            rho * (2 + num_edges))
 
         new_yf = yf + rho * (new_wf - new_z)
         new_y0 = y0 + rho * (new_w0 - new_z)
@@ -100,4 +103,5 @@ def nmf_son(M, W, H, _lambda=0.0, itermax=1000, scale_lambda=False, verbose=Fals
 
         if verbose:
             print(f'Iteration: {it}, f={fscores[it]}, g={gscores[it]},  total={total_score}')
+
     return W_best, H_best, W, H, fscores, gscores, lambda_vals
