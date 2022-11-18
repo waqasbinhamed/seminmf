@@ -13,8 +13,9 @@ def calculate_gscore(W, r):
     return gscore
 
 
-def update_wj(W, Mj, new_z, hj, j, m, r, _lambda, rho=0.75, itermax=1000):
-    num_edges = r * (r - 1)
+def update_wj(W, Mj, new_z, hj, j, m, r, _lambda, itermax=1000):
+    rho = 1
+    num_edges = (r * (r - 1)) / 2
     ci_arr = np.delete(W, j, axis=1)
 
     new_wi_arr = np.zeros((m, r - 1))
