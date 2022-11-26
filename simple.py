@@ -402,5 +402,6 @@ if __name__ == '__main__':
     r = 5
     W_ini = np.random.rand(m, r)
     H_ini = np.random.rand(r, n)
-    Wb, Hb, Wl, Hl, fscores, gscores, lvals = nmf_son(M, W_ini.copy(), H_ini.copy(), _lambda=0.4, itermax=10, scale_lambda=True, andersen_type='z', andersen_win=3, verbose=True)
+    Wb, Hb, Wl, Hl, fscores, gscores, lvals = nmf_son(M, W_ini.copy(), H_ini.copy(), _lambda=0.4, itermax=10,
+                                                      andersen_type='z', andersen_win=3, verbose=True)
     print('done')
