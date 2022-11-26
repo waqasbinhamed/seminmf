@@ -8,16 +8,41 @@ def non_neg(arr):
     return arr
 
 
-def calculate_gscore(W, rank):
+def calculate_gscore(W):
     """Calculates the sum of norm of the W matrix."""
+    rank = W.shape[1]
     gscore = 0
     for i in range(rank - 1):
         gscore += np.sum(np.linalg.norm(W[:, i: i + 1] - W[:, i + 1:], axis=0))
     return gscore
 
 
-def update_wj(W, Mj, new_z, hj, j, m, r, _lambda, itermax=1000):
+def find_andersen_coeff(R_history):
+    """
+    Compute the combination coefficients alpha_i in Anderson acceleration, i.e., solve
+        argmin sum_{i=0}^m alpha_i r_{k-i},  s.t. sum_{i=0}^{m} alpha_i = 1
+    Solve using the equivalent least square problem by eliminating the constraint
+    """
+    nc = R_history.shape[1]
+
+    # Construct least square matrix
+    if nc == 1:
+        c = np.ones(1)
+    else:
+        Y = R_history[:, 1:] - R_history[:, 0:-1]
+        b = R_history[:, -1]
+        q, r = np.linalg.qr(Y)
+
+        z = np.linalg.solve(r, q.T @ b)
+        c = np.r_[z[0], z[1:] - z[0:-1], 1 - z[-1]]
+
+    return c
+
+
+def update_wj(W, Mj, new_z, hj, j, _lambda, itermax=1000):
     """Calculates the w_j vector without acceleration."""
+    m, r = W.shape
+
     rho = 1
     num_edges = (r * (r - 1)) / 2
     ci_arr = np.delete(W, j, axis=1)
@@ -58,30 +83,9 @@ def update_wj(W, Mj, new_z, hj, j, m, r, _lambda, itermax=1000):
     return new_z
 
 
-def find_andersen_coeff(R_history):
-    """
-    Compute the combination coefficients alpha_i in Anderson acceleration, i.e., solve
-        argmin sum_{i=0}^m alpha_i r_{k-i},  s.t. sum_{i=0}^{m} alpha_i = 1
-    Solve using the equivalent least square problem by eliminating the constraint
-    """
-    nc = R_history.shape[1]
-
-    # Construct least square matrix
-    if nc == 1:
-        c = np.ones(1)
-    else:
-        Y = R_history[:, 1:] - R_history[:, 0:-1]
-        b = R_history[:, -1]
-        q, r = np.linalg.qr(Y)
-
-        z = np.linalg.solve(r, q.T @ b)
-        c = np.r_[z[0], z[1:] - z[0:-1], 1 - z[-1]]
-
-    return c
-
-
-def update_wj_andersen_z(W, Mj, new_z, hj, j, m, r, _lambda, itermax=1000, andersen_win=None):
+def update_wj_andersen_z(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_win=None):
     """Calculates the w_j vector with andersen acceleration of only the dual vector z."""
+    m, r = W.shape
 
     rho = 1
     num_edges = (r * (r - 1)) / 2
@@ -138,8 +142,10 @@ def update_wj_andersen_z(W, Mj, new_z, hj, j, m, r, _lambda, itermax=1000, ander
     return new_z
 
 
-def update_wj_andersen_all(W, Mj, new_z, hj, j, m, r, _lambda, itermax=1000, andersen_win=None):
+def update_wj_andersen_all(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_win=None):
     """Calculates the w_j vector with andersen acceleration of w0, wf, wis, and z."""
+    m, r = W.shape
+
     rho = 1
     num_edges = (r * (r - 1)) / 2
     ci_arr = np.delete(W, j, axis=1)
@@ -233,71 +239,6 @@ def update_wj_andersen_all(W, Mj, new_z, hj, j, m, r, _lambda, itermax=1000, and
     return new_z
 
 
-def nmf_son(M, W, H, _lambda=0.0, itermax=1000, scale_lambda=False, andersen_type=None, andersen_win=None, verbose=False):
-    """Calculates NMF decomposition of the M matrix with andersen acceleration options."""
-    m, n = M.shape
-    r = W.shape[1]
-
-    fscores = np.zeros((itermax + 1,))
-    gscores = np.zeros((itermax + 1,))
-    lambda_vals = np.zeros((itermax + 1,))
-
-    fscores[0] = np.linalg.norm(M - W @ H, 'fro')
-    gscores[0] = calculate_gscore(W, r)
-
-    if scale_lambda:
-        scaled_lambda = lambda_vals[0] = (fscores[0] / gscores[0]) * _lambda
-    else:
-        scaled_lambda = _lambda
-        lambda_vals[:] = _lambda
-
-    best_score = np.Inf
-    W_best = np.zeros((m, r))
-    H_best = np.zeros((r, n))
-
-    Mj = M - W @ H
-    for it in range(1, itermax + 1):
-        for j in range(r):
-            wj = W[:, j: j + 1]
-            hj = H[j: j + 1, :]
-
-            Mj = Mj + wj @ hj
-
-            # update h_j
-            H[j: j + 1, :] = hj = non_neg(wj.T @ Mj) / (np.linalg.norm(wj) ** 2)
-
-            # update w_j
-            W[:, j: j + 1] = wj = update_wj(W, Mj, wj, hj, j, m, r, scaled_lambda)
-            if andersen_type and andersen_win:
-                if andersen_type == 'z':
-                    W[:, j: j + 1] = wj = update_wj_andersen_z(W, Mj, wj, hj, j, m, r, scaled_lambda, 
-                                                               andersen_win=andersen_win)
-                elif andersen_type == 'all':
-                    W[:, j: j + 1] = wj = update_wj_andersen_all(W, Mj, wj, hj, j, m, r, scaled_lambda,
-                                                               andersen_win=andersen_win)
-            else:
-                W[:, j: j + 1] = wj = update_wj(W, Mj, wj, hj, j, m, r, scaled_lambda)
-
-            Mj = Mj - wj @ hj
-
-        fscores[it] = np.linalg.norm(M - W @ H, 'fro')
-        gscores[it] = calculate_gscore(W, r)
-        total_score = fscores[it] + scaled_lambda * gscores[it]
-
-        if total_score > best_score:
-            best_score = total_score
-            W_best = W
-            H_best = H
-
-        if scale_lambda:
-            scaled_lambda = lambda_vals[it] = (fscores[it] / gscores[it]) * _lambda
-
-        if verbose:
-            print(f'Iteration: {it}, f={fscores[it]}, g={gscores[it]},  total={total_score}')
-
-    return W_best, H_best, W, H, fscores, gscores, np.r_[np.NaN, lambda_vals[1:]]
-
-
 def sep_update_H(M, W, H):
     """Calculates the updated H without altering the W matrix."""
     Mj = M - W @ H
@@ -327,7 +268,67 @@ def sep_update_W(M, W, H, scaled_lambda):
     return W
 
 
-def nmf_son_acc(M, W, H, _lambda=0.0, itermax=1000, scale_lambda=False, verbose=False):
+def nmf_son(M, W, H, _lambda=0.0, itermax=1000, andersen_type=None, andersen_win=None, verbose=False):
+    """Calculates NMF decomposition of the M matrix with andersen acceleration options."""
+    m, n = M.shape
+    r = W.shape[1]
+
+    fscores = np.zeros((itermax + 1,))
+    gscores = np.zeros((itermax + 1,))
+    lambda_vals = np.zeros((itermax + 1,))
+
+    fscores[0] = np.linalg.norm(M - W @ H, 'fro')
+    gscores[0] = calculate_gscore(W, r)
+
+    scaled_lambda = lambda_vals[0] = (fscores[0] / gscores[0]) * _lambda
+
+    best_score = np.Inf
+    W_best = np.zeros((m, r))
+    H_best = np.zeros((r, n))
+
+    Mj = M - W @ H
+    for it in range(1, itermax + 1):
+        for j in range(r):
+            wj = W[:, j: j + 1]
+            hj = H[j: j + 1, :]
+
+            Mj = Mj + wj @ hj
+
+            # update h_j
+            H[j: j + 1, :] = hj = non_neg(wj.T @ Mj) / (np.linalg.norm(wj) ** 2)
+
+            # update w_j
+            W[:, j: j + 1] = wj = update_wj(W, Mj, wj, hj, j, scaled_lambda)
+            if andersen_type and andersen_win:
+                if andersen_type == 'z':
+                    W[:, j: j + 1] = wj = update_wj_andersen_z(W, Mj, wj, hj, j, scaled_lambda,
+                                                               andersen_win=andersen_win)
+                elif andersen_type == 'all':
+                    W[:, j: j + 1] = wj = update_wj_andersen_all(W, Mj, wj, hj, j, scaled_lambda,
+                                                                 andersen_win=andersen_win)
+            else:
+                W[:, j: j + 1] = wj = update_wj(W, Mj, wj, hj, j, scaled_lambda)
+
+            Mj = Mj - wj @ hj
+
+        fscores[it] = np.linalg.norm(M - W @ H, 'fro')
+        gscores[it] = calculate_gscore(W, r)
+        total_score = fscores[it] + scaled_lambda * gscores[it]
+
+        if total_score > best_score:
+            best_score = total_score
+            W_best = W
+            H_best = H
+
+        scaled_lambda = lambda_vals[it] = (fscores[it] / gscores[it]) * _lambda
+
+        if verbose:
+            print(f'Iteration: {it}, f={fscores[it]}, g={gscores[it]},  total={total_score}')
+
+    return W_best, H_best, W, H, fscores, gscores, np.r_[np.NaN, lambda_vals[1:]]
+
+
+def nmf_son_acc(M, W, H, _lambda=0.0, itermax=1000, verbose=False):
     """Calculates NMF decomposition of the M matrix with new acceleration."""
     beta, _beta, gr, _gr, decay = 0.5, 1, 1.05, 1.01, 1.5
 
@@ -341,11 +342,7 @@ def nmf_son_acc(M, W, H, _lambda=0.0, itermax=1000, scale_lambda=False, verbose=
     fscores[0] = np.linalg.norm(M - W @ H, 'fro')
     gscores[0] = calculate_gscore(W, rank)
 
-    if scale_lambda:
-        scaled_lambda = lambda_vals[0] = (fscores[0] / gscores[0]) * _lambda
-    else:
-        scaled_lambda = _lambda
-        lambda_vals[:] = _lambda
+    scaled_lambda = lambda_vals[0] = (fscores[0] / gscores[0]) * _lambda
 
     best_score = np.Inf
     W_best = np.zeros((m, rank))
@@ -360,7 +357,6 @@ def nmf_son_acc(M, W, H, _lambda=0.0, itermax=1000, scale_lambda=False, verbose=
         # update W
         W_new = sep_update_W(M, W, H_hat, scaled_lambda)
         W_hat = non_neg(W_new + beta * (W_new - W))
-
 
         fscores[it] = np.linalg.norm(M - W @ H, 'fro')
         gscores[it] = calculate_gscore(W, rank)
@@ -383,8 +379,7 @@ def nmf_son_acc(M, W, H, _lambda=0.0, itermax=1000, scale_lambda=False, verbose=
             W_best = W
             H_best = H
 
-        if scale_lambda:
-            scaled_lambda = lambda_vals[it] = (fscores[it] / gscores[it]) * _lambda
+        scaled_lambda = lambda_vals[it] = (fscores[it] / gscores[it]) * _lambda
 
         if verbose:
             print(f'Iteration: {it}, f={fscores[it]}, g={gscores[it]},  total={total_score}')
