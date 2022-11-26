@@ -2,6 +2,7 @@ import numpy as np
 
 TOL = 1e-12
 
+
 def non_neg(arr):
     """Returns non-negative projection of array."""
     arr[arr < 0] = 0
