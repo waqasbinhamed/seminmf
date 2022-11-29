@@ -140,6 +140,7 @@ def update_wj_andersen_z(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_wi
         new_yf = yf + rho * (new_wf - new_z)
         new_y0 = y0 + rho * (new_w0 - new_z)
         new_yi_arr = yi_arr + rho * (new_wi_arr - new_z)
+
     return new_z
 
 
@@ -193,7 +194,7 @@ def update_wj_andersen_all(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_
 
             cw0 = find_andersen_coeff(w0_residuals)
             new_w0 = (prev_w0s @ cw0).reshape(m, 1)
-            
+
             prev_wis_arr = np.dstack((prev_wis_arr, new_wi_arr))
             wi_residuals_arr = np.dstack((wi_residuals_arr, new_wi_arr - z))
             if wi_residuals_arr.shape[2] > andersen_win:
@@ -237,6 +238,46 @@ def update_wj_andersen_all(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_
         new_yf = yf + rho * (new_wf - new_z)
         new_y0 = y0 + rho * (new_w0 - new_z)
         new_yi_arr = yi_arr + rho * (new_wi_arr - new_z)
+
+        if andersen_win is not None:
+            if it > 1:
+                prev_yfs = np.c_[prev_yfs, new_yf]
+                yf_residuals = np.c_[yf_residuals, new_yf - yf]
+                if yf_residuals.shape[1] > andersen_win:
+                    prev_yfs = prev_yfs[:, 1:]
+                    yf_residuals = yf_residuals[:, 1:]
+
+                cyf = find_andersen_coeff(yf_residuals)
+                new_yf = (prev_yfs @ cyf).reshape(m, 1)
+
+                prev_y0s = np.c_[prev_y0s, new_y0]
+                y0_residuals = np.c_[y0_residuals, new_y0 - y0]
+                if y0_residuals.shape[1] > andersen_win:
+                    prev_y0s = prev_y0s[:, 1:]
+                    y0_residuals = y0_residuals[:, 1:]
+
+                cy0 = find_andersen_coeff(y0_residuals)
+                new_y0 = (prev_y0s @ cy0).reshape(m, 1)
+
+                prev_yis_arr = np.dstack((prev_yis_arr, new_yi_arr))
+                yi_residuals_arr = np.dstack((yi_residuals_arr, new_yi_arr - yi_arr))
+                if yi_residuals_arr.shape[2] > andersen_win:
+                    prev_yis_arr = prev_yis_arr[:, :, 1:]
+                    yi_residuals_arr = yi_residuals_arr[:, :, 1:]
+
+                for i in range(r - 1):
+                    cyi = find_andersen_coeff(yi_residuals_arr[:, i, :])
+                    new_yi_arr[:, i: i + 1] = (prev_yis_arr[:, i, :] @ cyi).reshape(m, 1)
+
+            else:
+                prev_yfs = new_yf.copy()
+                yf_residuals = new_yf - yf
+
+                prev_y0s = new_y0.copy()
+                y0_residuals = new_y0 - y0
+
+                prev_yis_arr = new_yi_arr.copy()
+                yi_residuals_arr = new_yi_arr - yi_arr
     return new_z
 
 
