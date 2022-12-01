@@ -1,4 +1,0 @@
-# Small
-# trees3d = X3d[:, 280: 290, 120: 130] # (162, 10, 10)
-# roof3d = X3d[:, 110: 120, 200: 210] # (162, 10, 10)
-# smallX3d = np.hstack([trees3d, asphalt3d])  # (162, 20, 10)
