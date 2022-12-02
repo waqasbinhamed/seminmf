@@ -2,7 +2,7 @@ import numpy as np
 from nmf_son.utils import non_neg, calculate_gscore
 
 
-TOL = 1e-4
+ES_TOL = 1e-5
 INNER_TOL = 1e-6
 
 
@@ -50,7 +50,7 @@ def update_wj(W, Mj, new_z, hj, j, _lambda, itermax=1000):
     return new_z
 
 
-def nmf_son(M, W, H, _lambda=0.0, itermax=1000, early_stop=None, verbose=False):
+def nmf_son(M, W, H, _lambda=0.0, itermax=1000, early_stop=True, verbose=False):
     """Calculates NMF decomposition of the M matrix with andersen acceleration options."""
     m, n = M.shape
     r = W.shape[1]
@@ -93,9 +93,9 @@ def nmf_son(M, W, H, _lambda=0.0, itermax=1000, early_stop=None, verbose=False):
             W_best = W
             H_best = H
 
-        if early_stop:
+        if early_stop and it > 2:
             old_score = fscores[it - 1] + lambda_vals[it - 2] * gscores[it - 1]
-            if abs(old_score - total_score) / old_score < early_stop:
+            if abs(old_score - total_score) / old_score < ES_TOL:
                 break
 
         scaled_lambda = lambda_vals[it] = (fscores[it] / gscores[it]) * _lambda
@@ -103,4 +103,4 @@ def nmf_son(M, W, H, _lambda=0.0, itermax=1000, early_stop=None, verbose=False):
         if verbose:
             print(f'Iteration: {it}, f={fscores[it]}, g={gscores[it]},  total={total_score}')
 
-    return W_best, H_best, W, H, fscores, gscores, np.r_[np.NaN, lambda_vals[1:]]
+    return W_best, H_best, W, H, fscores[:it + 1], gscores[:it + 1], np.r_[np.NaN, lambda_vals[1: it + 1]]
