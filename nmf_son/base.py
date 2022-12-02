@@ -50,7 +50,7 @@ def update_wj(W, Mj, new_z, hj, j, _lambda, itermax=1000):
     return new_z
 
 
-def nmf_son(M, W, H, _lambda=0.0, itermax=1000, early_stop=False, verbose=False):
+def nmf_son(M, W, H, _lambda=0.0, itermax=1000, early_stop=None, verbose=False):
     """Calculates NMF decomposition of the M matrix with andersen acceleration options."""
     m, n = M.shape
     r = W.shape[1]
@@ -96,7 +96,7 @@ def nmf_son(M, W, H, _lambda=0.0, itermax=1000, early_stop=False, verbose=False)
         if early_stop:
             old_score = fscores[it - 1] + lambda_vals[it - 2] * gscores[it - 1]
             print(abs(old_score - total_score) / old_score)
-            if abs(old_score - total_score) / old_score < TOL:
+            if abs(old_score - total_score) / old_score < early_stop:
                 break
 
         scaled_lambda = lambda_vals[it] = (fscores[it] / gscores[it]) * _lambda
