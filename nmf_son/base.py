@@ -95,7 +95,6 @@ def nmf_son(M, W, H, _lambda=0.0, itermax=1000, early_stop=None, verbose=False):
 
         if early_stop:
             old_score = fscores[it - 1] + lambda_vals[it - 2] * gscores[it - 1]
-            print(abs(old_score - total_score) / old_score)
             if abs(old_score - total_score) / old_score < early_stop:
                 break
 
