@@ -28,8 +28,43 @@ def find_andersen_coeff(R_history):
     return c
 
 
-def update_wj_andersen_z(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_win=None):
-    """Calculates the w_j vector with andersen acceleration of only the dual vector z."""
+def andersen_acc_1d(first_it_flag, andersen_win, val, new_val, prev_vals=None, residuals=None):
+    if first_it_flag:
+        prev_vals = new_val.copy()
+        residuals = new_val - val
+    else:
+        prev_vals = np.c_[prev_vals, new_val]
+        residuals = np.c_[residuals, new_val - val]
+        if residuals.shape[1] > andersen_win:
+            prev_vals = prev_vals[:, 1:]
+            residuals = residuals[:, 1:]
+
+        coeffs = find_andersen_coeff(residuals)
+        new_val = (prev_vals @ coeffs).reshape(val.shape[0], 1)
+    return new_val, prev_vals, residuals
+
+
+def andersen_acc_2d(first_it_flag, andersen_win, val_arr, new_val_arr, prev_val_arr=None, residual_arr=None):
+    m, n = val_arr.shape
+
+    if first_it_flag:
+        prev_val_arr = new_val_arr.copy()
+        residual_arr = new_val_arr - val_arr
+    else:
+        prev_val_arr = np.dstack((prev_val_arr, new_val_arr))
+        residual_arr = np.dstack((residual_arr, new_val_arr - val_arr))
+        if residual_arr.shape[2] > andersen_win:
+            prev_val_arr = prev_val_arr[:, :, 1:]
+            residual_arr = residual_arr[:, :, 1:]
+        for i in range(n):
+            coeffs = find_andersen_coeff(residual_arr[:, i, :])
+            new_val_arr[:, i: i + 1] = (prev_val_arr[:, i, :] @ coeffs).reshape(m, 1)
+
+    return new_val_arr, prev_val_arr, residual_arr
+
+
+def update_wj_andersen_z(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_win=2):
+    """Calculates the w_j vector with andersen acceleration of only z."""
     m, r = W.shape
 
     rho = 1
@@ -66,30 +101,31 @@ def update_wj_andersen_z(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_wi
         if np.linalg.norm(new_z - z) / np.linalg.norm(z) < INNER_TOL:
             break
 
-        if andersen_win is not None:
-            if it > 1:
-                prev_zs = np.c_[prev_zs, new_z]
-                z_residuals = np.c_[z_residuals, new_z - z]
-                if z_residuals.shape[1] > andersen_win:
-                    prev_zs = prev_zs[:, 1:]
-                    z_residuals = z_residuals[:, 1:]
-
-                cz = find_andersen_coeff(z_residuals)
-                new_z = (prev_zs @ cz).reshape(m, 1)
-
-            else:
-                prev_zs = new_z.copy()
-                z_residuals = new_z - z
+        # andersen acceleration on z variable
+        if it > 0:
+            new_z, prev_z, res_z = andersen_acc_1d(False, andersen_win, z, new_z, prev_z, res_z)
+        else:
+            new_z, prev_z, res_z = andersen_acc_1d(True, andersen_win, z, new_z)
 
         new_yf = yf + rho * (new_wf - new_z)
         new_y0 = y0 + rho * (new_w0 - new_z)
         new_yi_arr = yi_arr + rho * (new_wi_arr - new_z)
+
+        # # andersen acceleration on yf, y0, yi_arr variable
+        # if it > 0:
+        #     new_yf, prev_yf, res_yf = andersen_acc_1d(False, andersen_win, yf, new_yf, prev_yf, res_yf)
+        #     new_y0, prev_y0, res_y0 = andersen_acc_1d(False, andersen_win, y0, new_y0, prev_y0, res_y0)
+        #     new_yi_arr, prev_yi_arr, res_yi_arr = andersen_acc_2d(False, andersen_win, yi_arr, new_yi_arr, prev_yi_arr, res_yi_arr)
+        # else:
+        #     new_yf, prev_yf, res_yf = andersen_acc_1d(True, andersen_win, yf, new_yf)
+        #     new_y0, prev_y0, res_y0 = andersen_acc_1d(True, andersen_win, y0, new_y0)
+        #     new_yi_arr, prev_yi_arr, res_yi_arr = andersen_acc_2d(True, andersen_win, yi_arr, new_yi_arr)
 
     return new_z
 
 
-def update_wj_andersen_all(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_win=None):
-    """Calculates the w_j vector with andersen acceleration of w0, wf, wis, and z."""
+def update_wj_andersen_all(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_win=2):
+    """Calculates the w_j vector with andersen acceleration of w0, wf, wi's, z."""
     m, r = W.shape
 
     rho = 1
@@ -120,34 +156,16 @@ def update_wj_andersen_all(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_
         new_wi_arr[:, norm_mask] = zeta_arr[:, norm_mask] - _lambda * (tmp_arr[:, norm_mask] / tmp_norm[norm_mask])
         new_wi_arr[:, ~norm_mask] = zeta_arr[:, ~norm_mask] - _lambda * tmp_arr[:, ~norm_mask]
 
-        if andersen_win and it > 1:
-            prev_wfs = np.c_[prev_wfs, new_wf]
-            wf_residuals = np.c_[wf_residuals, new_wf - z]
-            if wf_residuals.shape[1] > andersen_win:
-                prev_wfs = prev_wfs[:, 1:]
-                wf_residuals = wf_residuals[:, 1:]
+        # andersen acceleration on wf, w0, wi_arr variable
+        if it > 0:
+            new_wf, prev_wf, res_wf = andersen_acc_1d(False, andersen_win, z, new_wf, prev_wf, res_wf)
+            new_w0, prev_w0, res_w0 = andersen_acc_1d(False, andersen_win, z, new_w0, prev_w0, res_w0)
+            new_wi_arr, prev_wi_arr, res_wi_arr = andersen_acc_2d(False, andersen_win, z, new_wi_arr, prev_wi_arr, res_wi_arr)
+        else:
+            new_wf, prev_wf, res_wf = andersen_acc_1d(True, andersen_win, z, new_wf)
+            new_w0, prev_w0, res_w0 = andersen_acc_1d(True, andersen_win, z, new_w0)
+            new_wi_arr, prev_wi_arr, res_wi_arr = andersen_acc_2d(True, andersen_win, z, new_wi_arr)
 
-            cwf = find_andersen_coeff(wf_residuals)
-            new_wf = (prev_wfs @ cwf).reshape(m, 1)
-
-            prev_w0s = np.c_[prev_w0s, new_w0]
-            w0_residuals = np.c_[w0_residuals, new_w0 - z]
-            if w0_residuals.shape[1] > andersen_win:
-                prev_w0s = prev_w0s[:, 1:]
-                w0_residuals = w0_residuals[:, 1:]
-
-            cw0 = find_andersen_coeff(w0_residuals)
-            new_w0 = (prev_w0s @ cw0).reshape(m, 1)
-
-            prev_wis_arr = np.dstack((prev_wis_arr, new_wi_arr))
-            wi_residuals_arr = np.dstack((wi_residuals_arr, new_wi_arr - z))
-            if wi_residuals_arr.shape[2] > andersen_win:
-                prev_wis_arr = prev_wis_arr[:, :, 1:]
-                wi_residuals_arr = wi_residuals_arr[:, :, 1:]
-
-            for i in range(r - 1):
-                cwi = find_andersen_coeff(wi_residuals_arr[:, i, :])
-                new_wi_arr[:, i: i + 1] = (prev_wis_arr[:, i, :] @ cwi).reshape(m, 1)
 
         new_z = (rho * (new_wf + new_w0) + rho * np.sum(new_wi_arr, axis=1, keepdims=True) + yf + y0
                  + np.sum(yi_arr, axis=1, keepdims=True)) / (rho * (2 + num_edges))
@@ -155,73 +173,26 @@ def update_wj_andersen_all(W, Mj, new_z, hj, j, _lambda, itermax=1000, andersen_
         if np.linalg.norm(new_z - z) / np.linalg.norm(z) < INNER_TOL:
             break
 
-        if andersen_win:
-            if it > 1:
-                prev_zs = np.c_[prev_zs, new_z]
-                z_residuals = np.c_[z_residuals, new_z - z]
-                if z_residuals.shape[1] > andersen_win:
-                    prev_zs = prev_zs[:, 1:]
-                    z_residuals = z_residuals[:, 1:]
-
-                cz = find_andersen_coeff(z_residuals)
-                new_z = (prev_zs @ cz).reshape(m, 1)
-
-            else:
-                prev_zs = new_z.copy()
-                z_residuals = new_z - z
-
-                prev_wfs = new_wf.copy()
-                wf_residuals = new_wf - z
-
-                prev_w0s = new_wf.copy()
-                w0_residuals = new_w0 - z
-
-                prev_wis_arr = new_wi_arr.copy()
-                wi_residuals_arr = new_wi_arr - z
+        # andersen acceleration on z variable
+        if it > 0:
+            new_z, prev_z, res_z = andersen_acc_1d(False, andersen_win, z, new_z, prev_z, res_z)
+        else:
+            new_z, prev_z, res_z = andersen_acc_1d(True, andersen_win, z, new_z)
 
         new_yf = yf + rho * (new_wf - new_z)
         new_y0 = y0 + rho * (new_w0 - new_z)
         new_yi_arr = yi_arr + rho * (new_wi_arr - new_z)
 
-        if andersen_win is not None:
-            if it > 1:
-                prev_yfs = np.c_[prev_yfs, new_yf]
-                yf_residuals = np.c_[yf_residuals, new_yf - yf]
-                if yf_residuals.shape[1] > andersen_win:
-                    prev_yfs = prev_yfs[:, 1:]
-                    yf_residuals = yf_residuals[:, 1:]
+        # # andersen acceleration on yf, y0, yi_arr variable
+        # if it > 0:
+        #     new_yf, prev_yf, res_yf = andersen_acc_1d(False, andersen_win, yf, new_yf, prev_yf, res_yf)
+        #     new_y0, prev_y0, res_y0 = andersen_acc_1d(False, andersen_win, y0, new_y0, prev_y0, res_y0)
+        #     new_yi_arr, prev_yi_arr, res_yi_arr = andersen_acc_2d(False, andersen_win, yi_arr, new_yi_arr, prev_yi_arr, res_yi_arr)
+        # else:
+        #     new_yf, prev_yf, res_yf = andersen_acc_1d(True, andersen_win, yf, new_yf)
+        #     new_y0, prev_y0, res_y0 = andersen_acc_1d(True, andersen_win, y0, new_y0)
+        #     new_yi_arr, prev_yi_arr, res_yi_arr = andersen_acc_2d(True, andersen_win, yi_arr, new_yi_arr)
 
-                cyf = find_andersen_coeff(yf_residuals)
-                new_yf = (prev_yfs @ cyf).reshape(m, 1)
-
-                prev_y0s = np.c_[prev_y0s, new_y0]
-                y0_residuals = np.c_[y0_residuals, new_y0 - y0]
-                if y0_residuals.shape[1] > andersen_win:
-                    prev_y0s = prev_y0s[:, 1:]
-                    y0_residuals = y0_residuals[:, 1:]
-
-                cy0 = find_andersen_coeff(y0_residuals)
-                new_y0 = (prev_y0s @ cy0).reshape(m, 1)
-
-                prev_yis_arr = np.dstack((prev_yis_arr, new_yi_arr))
-                yi_residuals_arr = np.dstack((yi_residuals_arr, new_yi_arr - yi_arr))
-                if yi_residuals_arr.shape[2] > andersen_win:
-                    prev_yis_arr = prev_yis_arr[:, :, 1:]
-                    yi_residuals_arr = yi_residuals_arr[:, :, 1:]
-
-                for i in range(r - 1):
-                    cyi = find_andersen_coeff(yi_residuals_arr[:, i, :])
-                    new_yi_arr[:, i: i + 1] = (prev_yis_arr[:, i, :] @ cyi).reshape(m, 1)
-
-            else:
-                prev_yfs = new_yf.copy()
-                yf_residuals = new_yf - yf
-
-                prev_y0s = new_y0.copy()
-                y0_residuals = new_y0 - y0
-
-                prev_yis_arr = new_yi_arr.copy()
-                yi_residuals_arr = new_yi_arr - yi_arr
     return new_z
 
 
@@ -333,5 +304,3 @@ def nmf_son_all_accelerated(M, W, H, _lambda=0.0, itermax=1000, andersen_win=2, 
             print(f'Iteration: {it}, f={fscores[it]}, g={gscores[it]},  total={total_score}')
 
     return W_best, H_best, W, H, fscores[:it + 1], gscores[:it + 1], np.r_[np.NaN, lambda_vals[1: it + 1]]
-
-
