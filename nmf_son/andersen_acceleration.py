@@ -2,7 +2,7 @@ import numpy as np
 from nmf_son.utils import non_neg, calculate_gscore
 
 
-TOL = 1e-4
+ES_TOL = 1e-5
 INNER_TOL = 1e-6
 
 
@@ -267,10 +267,9 @@ def nmf_son_z_accelerated(M, W, H, _lambda=0.0, itermax=1000, andersen_win=2, ea
             W_best = W
             H_best = H
 
-        if early_stop:
+        if early_stop and it > 2:
             old_score = fscores[it - 1] + lambda_vals[it - 2] * gscores[it - 1]
-            print(abs(old_score - total_score) / old_score)
-            if abs(old_score - total_score) / old_score < TOL:
+            if abs(old_score - total_score) / old_score < ES_TOL:
                 break
 
         scaled_lambda = lambda_vals[it] = (fscores[it] / gscores[it]) * _lambda
@@ -278,7 +277,7 @@ def nmf_son_z_accelerated(M, W, H, _lambda=0.0, itermax=1000, andersen_win=2, ea
         if verbose:
             print(f'Iteration: {it}, f={fscores[it]}, g={gscores[it]},  total={total_score}')
 
-    return W_best, H_best, W, H, fscores, gscores, np.r_[np.NaN, lambda_vals[1:]]
+    return W_best, H_best, W, H, fscores[:it + 1], gscores[:it + 1], np.r_[np.NaN, lambda_vals[1: it + 1]]
 
 
 def nmf_son_all_accelerated(M, W, H, _lambda=0.0, itermax=1000, andersen_win=2, early_stop=False, verbose=False):
@@ -323,10 +322,9 @@ def nmf_son_all_accelerated(M, W, H, _lambda=0.0, itermax=1000, andersen_win=2, 
             W_best = W
             H_best = H
 
-        if early_stop:
+        if early_stop and it > 2:
             old_score = fscores[it - 1] + lambda_vals[it - 2] * gscores[it - 1]
-            print(abs(old_score - total_score) / old_score)
-            if abs(old_score - total_score) / old_score < TOL:
+            if abs(old_score - total_score) / old_score < ES_TOL:
                 break
 
         scaled_lambda = lambda_vals[it] = (fscores[it] / gscores[it]) * _lambda
@@ -334,4 +332,6 @@ def nmf_son_all_accelerated(M, W, H, _lambda=0.0, itermax=1000, andersen_win=2, 
         if verbose:
             print(f'Iteration: {it}, f={fscores[it]}, g={gscores[it]},  total={total_score}')
 
-    return W_best, H_best, W, H, fscores, gscores, np.r_[np.NaN, lambda_vals[1:]]
+    return W_best, H_best, W, H, fscores[:it + 1], gscores[:it + 1], np.r_[np.NaN, lambda_vals[1: it + 1]]
+
+
