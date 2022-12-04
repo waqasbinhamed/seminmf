@@ -229,7 +229,7 @@ def nmf_son_z_accelerated(M, W, H, _lambda=0.0, itermax=1000, andersen_win=2, ea
             W[:, j: j + 1] = wj = update_wj_andersen_z(W, Mj, wj, hj, j, scaled_lambda, andersen_win=andersen_win)
             Mj = Mj - wj @ hj
 
-        fscores[it] = np.linalg.norm(M - W @ H, 'fro')
+        fscores[it] = 0.5 * np.linalg.norm(M - W @ H, 'fro') ** 2
         gscores[it] = calculate_gscore(W)
         total_score = fscores[it] + scaled_lambda * gscores[it]
 
@@ -284,7 +284,7 @@ def nmf_son_all_accelerated(M, W, H, _lambda=0.0, itermax=1000, andersen_win=2, 
             W[:, j: j + 1] = wj = update_wj_andersen_all(W, Mj, wj, hj, j, scaled_lambda, andersen_win=andersen_win)
             Mj = Mj - wj @ hj
 
-        fscores[it] = np.linalg.norm(M - W @ H, 'fro')
+        fscores[it] = 0.5 * np.linalg.norm(M - W @ H, 'fro') ** 2
         gscores[it] = calculate_gscore(W)
         total_score = fscores[it] + scaled_lambda * gscores[it]
 

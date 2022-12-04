@@ -110,7 +110,7 @@ def nmf_son_alt(update_w_func, M, W, H, _lambda=0.0, itermax=1000, early_stop=Tr
 
             Mj = Mj - wj @ hj
 
-        fscores[it] = np.linalg.norm(M - W @ H, 'fro')
+        fscores[it] = 0.5 * np.linalg.norm(M - W @ H, 'fro') ** 2
         gscores[it] = calculate_gscore(W)
         total_score = fscores[it] + scaled_lambda * gscores[it]
 

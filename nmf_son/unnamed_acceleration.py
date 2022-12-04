@@ -65,7 +65,7 @@ def nmf_son_acc(M, W, H, _lambda=0.0, itermax=1000, early_stop=False, verbose=Fa
         W_new = sep_update_W(M, W, H_hat, scaled_lambda)
         W_hat = non_neg(W_new + beta * (W_new - W))
 
-        fscores[it] = np.linalg.norm(M - W @ H, 'fro')
+        fscores[it] = 0.5 * np.linalg.norm(M - W @ H, 'fro') ** 2
         gscores[it] = calculate_gscore(W)
         total_score = fscores[it] + scaled_lambda * gscores[it]
 
