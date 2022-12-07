@@ -1,5 +1,6 @@
 import numpy as np
 from nmf_son.utils import non_neg, calculate_gscore
+np.seterr(all='raise')
 
 
 ES_TOL = 1e-5
